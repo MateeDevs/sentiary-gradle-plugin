@@ -20,17 +20,11 @@ The plugin can be configured using the `sentiary` extension in your `build.gradl
 
 ```kotlin
 sentiary {
-    // Sentiary API URL (optional, defaults to https://api.sentiary.com/)
-    sentiaryUrl = "https://api.sentiary.com/"
-
     // Sentiary project ID (required, see credentials sections)
     projectId = "YOUR_PROJECT_ID"
 
     // Sentiary project API key (required, see credentials sections)
     projectApiKey = "YOUR_PROJECT_API_KEY"
-
-    // Network request timeout in milliseconds (optional, defaults to 100000)
-    requestTimeoutMillis = 100_000L
 
     // Default language for your project (optional, defaults to en-US)
     defaultLanguage = "en-US"
@@ -46,7 +40,7 @@ sentiary {
     // Export paths for localization files (required)
     exportPaths {
         create("android") {
-            // Export format (e.g., ANDROID_XML, IOS_STRINGS)
+            // Export format
             format = com.sentiary.config.Format.Android
 
             // Path to the output directory
