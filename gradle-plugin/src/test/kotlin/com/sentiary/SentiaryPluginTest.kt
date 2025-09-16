@@ -10,7 +10,7 @@ class SentiaryPluginTest {
     fun `plugin registers sentiaryFetch task`() {
         // Arrange
         val project = ProjectBuilder.builder().build()
-        project.plugins.apply("com.sentiary")
+        project.plugins.apply("com.sentiary.gradle")
 
         // Act & Assert
         project.tasks.findByName("sentiaryFetch") shouldNotBe null
