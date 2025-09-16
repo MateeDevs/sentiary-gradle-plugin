@@ -5,6 +5,6 @@ plugins {
 }
 
 allprojects {
-    group = "sentiary"
+    group = "com.sentiary"
     version = "1.0.0"
 }
