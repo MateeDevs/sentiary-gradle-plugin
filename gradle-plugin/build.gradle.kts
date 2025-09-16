@@ -36,7 +36,7 @@ gradlePlugin {
     vcsUrl.set("https://github.com/MateeDevs/sentiary-gradle-plugin.git")
     plugins {
         create("sentiary") {
-            id = "com.sentiary"
+            id = "com.sentiary.gradle"
             implementationClass = "com.sentiary.SentiaryPlugin"
             version = project.version as String
             displayName = "Sentiary Gradle Plugin"
