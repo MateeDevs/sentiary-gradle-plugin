@@ -10,7 +10,7 @@ First, apply the plugin in your project's `build.gradle.kts`:
 
 ```kotlin
 plugins {
-    id("com.sentiary") version "0.0.1"
+    id("com.sentiary") version "1.0.0"
 }
 ```
 
