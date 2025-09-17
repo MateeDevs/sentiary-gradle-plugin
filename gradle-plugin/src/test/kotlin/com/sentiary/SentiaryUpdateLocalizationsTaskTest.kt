@@ -269,4 +269,189 @@ class SentiaryUpdateLocalizationsTaskTest {
         val result2 = runTask("sentiaryUpdateLocalizations")
         result2.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.SUCCESS
     }
+
+    @Test
+    fun `task succeeds with no languages from api`() {
+        // Arrange
+        mockProjectInfo = ProjectInfo("1", "Test", emptyList(), termsLastModified = now)
+        startServer()
+        writeBuildFile("""
+            import com.sentiary.config.Format
+            plugins { id("com.sentiary.gradle") }
+            sentiary {
+                projectId = "test-project"
+                projectApiKey = "test-api-key"
+                exportPaths { create("android") { format = Format.Android; outputDirectory.set(layout.projectDirectory.dir("src/main/res")) } }
+            }
+        """.trimIndent())
+
+        // Act
+        val result = runTask("sentiaryUpdateLocalizations")
+
+        // Assert
+        result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.SUCCESS
+        val outputDir = projectDir.resolve("src/main/res")
+        // The parent directory gets created, but it should be empty
+        outputDir.exists() shouldBe true
+        outputDir.listFiles()?.isEmpty() shouldBe true
+    }
+
+    @Test
+    fun `task succeeds with no export paths configured`() {
+        // Arrange
+        startServer()
+        writeBuildFile("""
+            plugins { id("com.sentiary.gradle") }
+            sentiary {
+                projectId = "test-project"
+                projectApiKey = "test-api-key"
+            }
+        """.trimIndent())
+
+        // Act
+        val result = runTask("sentiaryUpdateLocalizations")
+
+        // Assert
+        result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.SUCCESS
+        projectDir.resolve("src/main/res").exists() shouldBe false
+    }
+
+    @Test
+    fun `build fails with read-only output directory`() {
+        // Arrange
+        startServer()
+        writeBuildFile("""
+            import com.sentiary.config.Format
+            plugins { id("com.sentiary.gradle") }
+            sentiary {
+                projectId = "test-project"
+                projectApiKey = "test-api-key"
+                exportPaths { create("android") { format = Format.Android; outputDirectory.set(layout.projectDirectory.dir("src/main/res")) } }
+            }
+        """.trimIndent())
+        val outputDir = projectDir.resolve("src/main/res")
+        outputDir.mkdirs()
+        outputDir.setReadOnly()
+
+        // Act
+        val result = runAndFail("sentiaryUpdateLocalizations")
+
+        // Assert
+        result.output shouldContain "BUILD FAILED"
+    }
+
+    @Test
+    fun `respects custom naming strategies`() {
+        // Arrange
+        startServer()
+        writeBuildFile("""
+            import com.sentiary.config.Format
+            plugins { id("com.sentiary.gradle") }
+            sentiary {
+                projectId = "test-project"
+                projectApiKey = "test-api-key"
+                defaultLanguage = "en-US"
+                exportPaths {
+                    create("android") {
+                        format = Format.Android
+                        outputDirectory.set(layout.projectDirectory.dir("src/main/res"))
+                        folderNamingStrategy { language, isDefault -> if (isDefault) "values-en-default" else "values-lang-${'$'}language" }
+                        fileNamingStrategy { _, _ -> "my_strings.xml" }
+                    }
+                }
+            }
+        """.trimIndent())
+
+        // Act
+        val result = runTask("sentiaryUpdateLocalizations")
+
+        // Assert
+        result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.SUCCESS
+        projectDir.resolve("src/main/res/values-en-default/my_strings.xml").exists() shouldBe true
+        projectDir.resolve("src/main/res/values-lang-de-DE/my_strings.xml").exists() shouldBe true
+    }
+
+    @Test
+    fun `handles multiple export paths`() {
+        // Arrange
+        startServer()
+        writeBuildFile("""
+            import com.sentiary.config.Format
+            plugins { id("com.sentiary.gradle") }
+            sentiary {
+                projectId = "test-project"
+                projectApiKey = "test-api-key"
+                exportPaths {
+                    create("android") {
+                        format = Format.Android
+                        outputDirectory.set(layout.projectDirectory.dir("src/main/res"))
+                    }
+                    create("json") {
+                        format = Format.Android // Using Android format for simplicity, just to test file writing
+                        outputDirectory.set(layout.projectDirectory.dir("src/main/json"))
+                    }
+                }
+            }
+        """.trimIndent())
+
+        // Act
+        val result = runTask("sentiaryUpdateLocalizations")
+
+        // Assert
+        result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.SUCCESS
+        projectDir.resolve("src/main/res/values/strings.xml").exists() shouldBe true
+        projectDir.resolve("src/main/json/values/strings.xml").exists() shouldBe true
+    }
+
+    @Test
+    fun `handles chained language fallbacks`() {
+        // Arrange
+        mockProjectInfo = ProjectInfo("1", "Test", listOf("en-US"), termsLastModified = now)
+        startServer()
+        writeBuildFile("""
+            import com.sentiary.config.Format
+            plugins { id("com.sentiary.gradle") }
+            sentiary {
+                projectId = "test-project"
+                projectApiKey = "test-api-key"
+                languageOverrides {
+                    create("en-CA") { fallbackTo = "en-GB" }
+                    create("en-GB") { fallbackTo = "en-US" }
+                }
+                exportPaths { create("android") { format = Format.Android; outputDirectory.set(layout.projectDirectory.dir("src/main/res")) } }
+            }
+        """.trimIndent())
+
+        // Act
+        val result = runTask("sentiaryUpdateLocalizations")
+
+        // Assert
+        result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.SUCCESS
+        projectDir.resolve("src/main/res/values-en-GB/strings.xml").readText() shouldBe mockEnLocalization
+        projectDir.resolve("src/main/res/values-en-CA/strings.xml").readText() shouldBe mockEnLocalization
+    }
+
+    @Test
+    fun `uses credentials from gradle properties`() {
+        // Arrange
+        startServer()
+        projectDir.resolve("gradle.properties").writeText("""
+            sentiary.projectId=prop-project-id
+            sentiary.projectApiKey=prop-api-key
+        """.trimIndent())
+        writeBuildFile("""
+            import com.sentiary.config.Format
+            plugins { id("com.sentiary.gradle") }
+            sentiary {
+                // Credentials are not set here, should be picked from properties
+                exportPaths { create("android") { format = Format.Android; outputDirectory.set(layout.projectDirectory.dir("src/main/res")) } }
+            }
+        """.trimIndent())
+
+        // Act
+        val result = runTask("sentiaryUpdateLocalizations")
+
+        // Assert
+        result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.SUCCESS
+    }
 }
