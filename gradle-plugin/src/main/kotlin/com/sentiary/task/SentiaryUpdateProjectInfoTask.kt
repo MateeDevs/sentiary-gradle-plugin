@@ -4,6 +4,7 @@ import com.sentiary.api.SentiaryApiClientService
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.gradle.api.DefaultTask
+import org.gradle.api.GradleException
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Internal
@@ -22,7 +23,7 @@ abstract class SentiaryUpdateProjectInfoTask : DefaultTask() {
     fun execute() {
         val service = sentiaryApiClientService.get()
         if (!service.parameters.projectId.isPresent || !service.parameters.projectApiKey.isPresent) {
-            throw IllegalArgumentException("Sentiary projectId and projectApiKey must be set.")
+            throw GradleException("Sentiary projectId and projectApiKey must be set.")
         }
 
         val projectInfo = runBlocking {

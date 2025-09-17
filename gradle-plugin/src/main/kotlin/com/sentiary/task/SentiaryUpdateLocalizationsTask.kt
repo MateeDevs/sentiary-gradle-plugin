@@ -7,6 +7,7 @@ import com.sentiary.config.LanguageOverride
 import com.sentiary.model.ProjectInfo
 import kotlinx.serialization.json.Json
 import org.gradle.api.DefaultTask
+import org.gradle.api.GradleException
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
@@ -55,7 +56,7 @@ abstract class SentiaryUpdateLocalizationsTask : DefaultTask() {
     fun execute() {
         val service = sentiaryApiClientService.get()
         if (!service.parameters.projectId.isPresent || !service.parameters.projectApiKey.isPresent) {
-            throw IllegalArgumentException("Sentiary projectId and projectApiKey must be set.")
+            throw GradleException("Sentiary projectId and projectApiKey must be set.")
         }
 
         val projectInfo =

@@ -18,14 +18,7 @@ internal class LocalizationOutputProvider(
     }
 
     val languagesToFetch: Set<String> by lazy {
-        val fallbackSources = languageOverrides
-            .mapNotNull { it.fallbackTo.orNull }
-            .filterNot { it in disabledLanguages }
-            .toSet()
-
-        val languagesWithoutOverrides = expectedLanguages - languageOverrides.map { it.name }.toSet()
-
-        languagesWithoutOverrides + fallbackSources
+        expectedLanguages - languageOverrides.map { it.name }.toSet()
     }
 
     fun getOutputFiles(): List<File> {

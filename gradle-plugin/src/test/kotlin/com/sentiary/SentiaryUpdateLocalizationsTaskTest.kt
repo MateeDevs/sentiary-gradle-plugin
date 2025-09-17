@@ -89,12 +89,12 @@ class SentiaryUpdateLocalizationsTaskTest {
     }
 
     private fun runTask(vararg arguments: String): org.gradle.testkit.runner.BuildResult {
-        val args = arguments.toList() + "-Dcom.sentiary.internal.test.url=http://localhost:${getPort()}/" + "--stacktrace"
+        val args = arguments.toList() + "-Dcom.sentiary.internal.test.url=http://localhost:${getPort()}/" + "--info"
         return runner.withArguments(args).build()
     }
 
     private fun runAndFail(vararg arguments: String): org.gradle.testkit.runner.BuildResult {
-        val args = arguments.toList() + "-Dcom.sentiary.internal.test.url=http://localhost:${getPort()}/" + "--stacktrace"
+        val args = arguments.toList() + "-Dcom.sentiary.internal.test.url=http://localhost:${getPort()}/" + "--info"
         return runner.withArguments(args).buildAndFail()
     }
 
@@ -453,5 +453,61 @@ class SentiaryUpdateLocalizationsTaskTest {
 
         // Assert
         result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.SUCCESS
+    }
+
+    @Test
+    fun `fails when chained language fallbacks are not available`() {
+        // Arrange
+        // API provides en-US, but the chain is en-AU -> en-GB. The link is broken because en-GB is not provided.
+        mockProjectInfo = ProjectInfo("1", "Test", listOf("en-US"), termsLastModified = now)
+        startServer()
+        writeBuildFile("""
+            import com.sentiary.config.Format
+            plugins { id("com.sentiary.gradle") }
+            sentiary {
+                projectId = "test-project"
+                projectApiKey = "test-api-key"
+                languageOverrides {
+                    create("en-AU") { fallbackTo = "en-GB" }
+                }
+                exportPaths { create("android") { format = Format.Android; outputDirectory.set(layout.projectDirectory.dir("src/main/res")) } }
+            }
+        """.trimIndent())
+
+        // Act
+        val result = runAndFail("sentiaryUpdateLocalizations")
+
+        // Assert
+        result.output shouldContain "BUILD FAILED"
+        result.output shouldContain "Could not resolve fallback for 'en-AU'. The dependency 'en-GB' is missing."
+    }
+
+    @Test
+    fun `fails on circular dependency in language fallbacks`() {
+        // Arrange
+        mockProjectInfo = ProjectInfo("1", "Test", listOf("en-US"), termsLastModified = now)
+        startServer()
+        writeBuildFile("""
+            import com.sentiary.config.Format
+            plugins { id("com.sentiary.gradle") }
+            sentiary {
+                projectId = "test-project"
+                projectApiKey = "test-api-key"
+                languageOverrides {
+                    create("en-CA") { fallbackTo = "en-GB" }
+                    create("en-GB") { fallbackTo = "en-CA" } // Cycle!
+                }
+                exportPaths { create("android") { format = Format.Android; outputDirectory.set(layout.projectDirectory.dir("src/main/res")) } }
+            }
+        """.trimIndent())
+
+        // Act
+        val result = runAndFail("sentiaryUpdateLocalizations")
+
+        // Assert
+        result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.FAILED
+        result.output shouldContain "Could not resolve language overrides due to a circular dependency."
+        projectDir.resolve("src/main/res/values-en-CA").exists() shouldBe false
+        projectDir.resolve("src/main/res/values-en-GB").exists() shouldBe false
     }
 }
