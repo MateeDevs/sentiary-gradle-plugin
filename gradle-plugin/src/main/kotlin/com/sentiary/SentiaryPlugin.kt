@@ -65,7 +65,9 @@ open class SentiaryPlugin : Plugin<Project> {
             cacheFile.set(project.layout.buildDirectory.file("sentiary/timestamp"))
             projectInfoFile.set(sentiaryUpdateProjectInfoTask.flatMap { it.projectInfoFile })
 
-            outputs.dirs(sentiaryExtension.exportPaths.map { it.outputDirectory })
+            // We do not declare output directories because this task writes into a shared resource folder (`src/main/res`).
+            // Declaring it would create an incorrect implicit dependency for all other tasks that use this folder.
+            // Instead, we rely entirely on our custom up-to-date spec to ensure the task runs when needed.
             outputs.upToDateWhen(
                 SentiaryUpdateLocalizationsSpec(
                     forceUpdate = forceUpdate,

@@ -4,9 +4,9 @@ The Sentiary Gradle plugin provides a convenient way to download and manage your
 
 ## Setup
 
-To use the Sentiary Gradle plugin, you need to apply it in your `build.gradle.kts` file and configure it with your project details.
+To use the Sentiary Gradle plugin, you need to apply it in your `build.gradle.kts` file. For multi-project builds, it is recommended to apply the plugin in your root `build.gradle.kts` file.
 
-First, apply the plugin in your project's `build.gradle.kts`:
+First, apply the plugin:
 
 ```kotlin
 plugins {
@@ -98,7 +98,9 @@ This task updates a local cache of the Sentiary project information, including l
 
 ### `sentiaryUpdateLocalizations`
 
-This is the main task to run to get the newest translations. It downloads and exports the localization files from Sentiary based on your configuration. It is recommended to run this task before building your project to ensure you have the latest translations.
+This is the main task to run to get the newest translations. It downloads and exports the localization files from Sentiary based on your configuration.
+
+Because this task writes into a shared source directory (like `src/main/res`), you **must** manually declare a dependency on it for any task that consumes the generated files. This ensures that your project always builds with the latest translations.
 
 You can run the task from the command line:
 
@@ -112,32 +114,36 @@ To force the task to download the latest localizations regardless of the cache s
 ./gradlew sentiaryUpdateLocalizations --force-update
 ```
 
-Or you can make it a dependency of another task, for example `preBuild`:
+### Usage Examples
+
+Here are some common use cases for integrating the Sentiary plugin. When applying the plugin to your root `build.gradle.kts` file, you can use the `subprojects` block to configure task dependencies for the relevant subprojects.
+
+The following snippet shows how to configure dependencies for standard Android, Compose Multiplatform, and Moko Resources projects. You can use any or all of these configurations as needed.
 
 ```kotlin
+// In your root build.gradle.kts
 val sentiaryUpdateLocalizationsTask = tasks.named<com.sentiary.task.SentiaryUpdateLocalizationsTask>("sentiaryUpdateLocalizations")
 
-tasks.named("preBuild") {
-    dependsOn(sentiaryUpdateLocalizationsTask)
-}
-```
+subprojects {
+    // For standard Android Applications
+    plugins.withId("com.android.application") {
+        tasks.withType<com.android.build.gradle.tasks.ProcessAndroidResources> {
+            dependsOn(sentiaryUpdateLocalizationsTask)
+        }
+    }
 
-<details>
-<summary>Compose Resources configuration</summary>
+    // For JetBrains Compose for Multiplatform
+    plugins.withId("org.jetbrains.compose") {
+        tasks.named("generateComposeResClass") {
+            dependsOn(sentiaryUpdateLocalizationsTask)
+        }
+    }
 
-```kts
-val sentiaryUpdateLocalizationsTask = tasks.named<com.sentiary.task.SentiaryUpdateLocalizationsTask>("sentiaryUpdateLocalizations")
-
-plugins.withId("org.jetbrains.compose") {
-    tasks.matching {
-        it.name in listOf(
-            "generateComposeResClass",
-            "copyNonXmlValueResourcesForCommonMain",
-            "convertXmlValueResourcesForCommonMain",
-        )
-    }.configureEach {
-        dependsOn(sentiaryUpdateLocalizationsTask)
+    // For Moko Resources in a Kotlin Multiplatform project
+    plugins.withId("dev.icerock.mobile.multiplatform-resources") {
+        tasks.named("generateMRcommonMain") {
+            dependsOn(sentiaryUpdateLocalizationsTask)
+        }
     }
 }
 ```
-</details>

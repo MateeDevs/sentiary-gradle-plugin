@@ -4,6 +4,7 @@ import org.gradle.api.Named
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
 import javax.inject.Inject
 
@@ -15,7 +16,7 @@ abstract class ExportPath @Inject constructor(private val name: String) : Named 
     @get:Input
     abstract val format: Property<Format>
 
-    @get:OutputDirectory
+    @get:Internal
     abstract val outputDirectory: DirectoryProperty
 
     @get:Input
