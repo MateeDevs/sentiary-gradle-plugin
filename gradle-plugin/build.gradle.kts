@@ -45,12 +45,3 @@ gradlePlugin {
         }
     }
 }
-
-publishing {
-    repositories {
-        maven {
-            name = "localPluginRepository"
-            url = uri("../../local-plugin-repository")
-        }
-    }
-}
