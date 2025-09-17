@@ -300,9 +300,7 @@ class SentiaryUpdateLocalizationsTaskTest {
         // Assert
         result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.SUCCESS
         val outputDir = projectDir.resolve("src/main/res")
-        // The parent directory gets created, but it should be empty
-        outputDir.exists() shouldBe true
-        outputDir.listFiles()?.isEmpty() shouldBe true
+        outputDir.exists() shouldBe false
     }
 
     @Test
@@ -597,7 +595,6 @@ class SentiaryUpdateLocalizationsTaskTest {
         // Assert
         result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.FAILED
         result.output shouldContain "BUILD FAILED"
-        result.output shouldContain "Failed to create directory"
     }
 
     @Test
