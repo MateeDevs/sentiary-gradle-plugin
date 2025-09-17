@@ -1,9 +1,13 @@
 package com.sentiary
 
+import com.sentiary.api.SentiaryApiClientService
 import com.sentiary.config.DefaultFolderNamingStrategy
 import com.sentiary.config.FileNamingStrategyFromFormat
-import com.sentiary.api.SentiaryApiClientService
+import com.sentiary.config.LocalizationOutputProvider
+import com.sentiary.model.ProjectInfo
 import com.sentiary.task.SentiaryFetchTask
+import com.sentiary.task.SentiaryProjectInfoTask
+import kotlinx.serialization.json.Json
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.create
@@ -18,10 +22,6 @@ open class SentiaryPlugin : Plugin<Project> {
             fileNamingStrategy.convention(format.map { FileNamingStrategyFromFormat(it) })
         }
 
-        sentiaryExtension.languageOverrides.all {
-            fetch.convention(true)
-        }
-
         val sentiaryServiceProvider = project.gradle.sharedServices.registerIfAbsent(
             "sentiaryApiClient",
             SentiaryApiClientService::class.java
@@ -32,6 +32,15 @@ open class SentiaryPlugin : Plugin<Project> {
             parameters.requestTimeoutMillis.set(sentiaryExtension.requestTimeoutMillis)
         }
 
+        val sentiaryProjectInfoTask =
+            project.tasks.register<SentiaryProjectInfoTask>("sentiaryProjectInfo") {
+                group = "Sentiary"
+                description = "Downloads project info from Sentiary."
+                sentiaryApiClientService.set(sentiaryServiceProvider)
+                projectInfoFile.set(project.layout.buildDirectory.file("sentiary/project-info.json"))
+                outputs.upToDateWhen { false } // Always check for new languages
+            }
+
         project.tasks.register<SentiaryFetchTask>("sentiaryFetch") {
             group = "Sentiary"
             description = "Downloads and exports localization files from Sentiary."
@@ -39,21 +48,17 @@ open class SentiaryPlugin : Plugin<Project> {
             sentiaryApiClientService.set(sentiaryServiceProvider)
             defaultLanguage.set(sentiaryExtension.defaultLanguage)
             languageOverrides.set(project.provider { sentiaryExtension.languageOverrides.toList() })
+            disabledLanguages.set(sentiaryExtension.disabledLanguages)
             exportPaths.set(project.provider { sentiaryExtension.exportPaths.toList() })
             caching.set(sentiaryExtension.caching)
             cacheFile.set(sentiaryExtension.caching.cacheFilePath)
+            projectInfoFile.set(sentiaryProjectInfoTask.flatMap { it.projectInfoFile })
 
-            outputs.dirs(
-                project.provider {
-                    sentiaryExtension.exportPaths.map { it.outputDirectory }
-                }
-            )
-
-            // This task can never be UP-TO-DATE because it needs to check a remote API.
             // The task action itself will determine if work needs to be done.
-            outputs.upToDateWhen { false }
+            outputs.dirs(sentiaryExtension.exportPaths.map { it.outputDirectory })
 
             forceUpdate.convention(false)
+            dependsOn(sentiaryProjectInfoTask)
         }
     }
 }

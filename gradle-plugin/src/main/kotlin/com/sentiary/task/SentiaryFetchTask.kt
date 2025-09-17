@@ -4,11 +4,14 @@ import com.sentiary.api.SentiaryApiClientService
 import com.sentiary.config.CacheConfiguration
 import com.sentiary.config.ExportPath
 import com.sentiary.config.LanguageOverride
+import com.sentiary.model.ProjectInfo
+import kotlinx.serialization.json.Json
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.LocalState
 import org.gradle.api.tasks.Nested
@@ -24,11 +27,17 @@ abstract class SentiaryFetchTask : DefaultTask() {
     @get:Internal
     abstract val sentiaryApiClientService: Property<SentiaryApiClientService>
 
+    @get:InputFile
+    abstract val projectInfoFile: RegularFileProperty
+
     @get:Input
     abstract val defaultLanguage: Property<String>
 
     @get:Nested
     abstract val languageOverrides: ListProperty<LanguageOverride>
+
+    @get:Input
+    abstract val disabledLanguages: ListProperty<String>
 
     @get:Nested
     abstract val exportPaths: ListProperty<ExportPath>
@@ -46,13 +55,15 @@ abstract class SentiaryFetchTask : DefaultTask() {
             throw IllegalArgumentException("Sentiary projectId and projectApiKey must be set.")
         }
 
-        val client = service.client
+        val projectInfo = Json.decodeFromString<ProjectInfo>(projectInfoFile.get().asFile.readText())
 
         val worker = SentiaryWorker(
-            client = client,
+            client = service.client,
             logger = logger,
+            projectInfo = projectInfo,
             defaultLanguage = defaultLanguage.get(),
             languageOverrides = languageOverrides.get(),
+            disabledLanguages = disabledLanguages.get().toSet(),
             exportPaths = exportPaths.get(),
             cacheConfiguration = caching.get(),
             cacheFile = cacheFile.get().asFile,

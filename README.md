@@ -29,11 +29,16 @@ sentiary {
     // Default language for your project (optional, defaults to en-US)
     defaultLanguage = "en-US"
 
-    // Language-specific overrides (optional)
+    // A list of language identifiers to prevent from being downloaded or generated.
+    // This takes precedence over all other settings.
+    disabledLanguages = listOf("fr-FR", "de-DE")
+
+    // Language-specific overrides (optional).
+    // Use this to create a language that is a copy of another. For example,
+    // create an `sk-SK` localization that is a copy of the `cs-CZ` source.
     languageOverrides {
-        create("cs-CZ") {
-            fetch = true // or false to disable fetching for this language
-            fallbackTo = "en-US" // Language identifier for the language to use as the source of this language.
+        create("sk-SK") {
+            fallbackTo = "cs-CZ" // Language identifier for the language to use as the source.
         }
     }
 

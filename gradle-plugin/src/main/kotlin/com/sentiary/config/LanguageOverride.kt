@@ -14,10 +14,4 @@ abstract class LanguageOverride @Inject constructor(private val name: String) : 
      */
     @get:Input
     abstract val fallbackTo: Property<String>
-
-    /**
-     * Whether to fetch this language or not. Defaults to true.
-     */
-    @get:Input
-    abstract val fetch: Property<Boolean>
 }

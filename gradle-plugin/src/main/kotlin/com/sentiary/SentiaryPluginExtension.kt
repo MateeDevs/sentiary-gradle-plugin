@@ -7,6 +7,7 @@ import org.gradle.api.Action
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Project
 import org.gradle.api.model.ObjectFactory
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import javax.inject.Inject
 
@@ -31,6 +32,8 @@ abstract class SentiaryPluginExtension @Inject constructor(
     val languageOverrides: NamedDomainObjectContainer<LanguageOverride> =
         objects.domainObjectContainer(LanguageOverride::class.java)
 
+    abstract val disabledLanguages: ListProperty<String>
+
     val exportPaths: NamedDomainObjectContainer<ExportPath> =
         objects.domainObjectContainer(ExportPath::class.java)
 
@@ -40,6 +43,7 @@ abstract class SentiaryPluginExtension @Inject constructor(
         sentiaryUrl.convention("https://api.sentiary.com/")
         defaultLanguage.convention("en-US")
         requestTimeoutMillis.convention(100_000L)
+        disabledLanguages.convention(emptyList())
 
         projectId.convention(
             project.providers.gradleProperty("sentiary.projectId")
