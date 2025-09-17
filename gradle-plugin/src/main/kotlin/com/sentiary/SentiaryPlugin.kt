@@ -6,6 +6,7 @@ import com.sentiary.config.FileNamingStrategyFromFormat
 import com.sentiary.task.SentiaryUpdateLocalizationsSpec
 import com.sentiary.task.SentiaryUpdateLocalizationsTask
 import com.sentiary.task.SentiaryUpdateProjectInfoTask
+import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.create
@@ -18,6 +19,15 @@ open class SentiaryPlugin : Plugin<Project> {
         sentiaryExtension.exportPaths.all {
             folderNamingStrategy.convention(DefaultFolderNamingStrategy)
             fileNamingStrategy.convention(format.map { FileNamingStrategyFromFormat(it) })
+        }
+
+        project.afterEvaluate {
+            val exportPaths = sentiaryExtension.exportPaths
+            val outputDirs = exportPaths.map { it.outputDirectory.get().asFile }
+            val duplicates = outputDirs.groupingBy { it }.eachCount().filter { it.value > 1 }.keys
+            if (duplicates.isNotEmpty()) {
+                throw GradleException("Duplicate output directories found in sentiary exportPaths: ${duplicates.joinToString()}")
+            }
         }
 
         val sentiaryServiceProvider = project.gradle.sharedServices.registerIfAbsent(

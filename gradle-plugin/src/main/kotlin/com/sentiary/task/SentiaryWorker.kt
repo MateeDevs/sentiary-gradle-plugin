@@ -75,11 +75,7 @@ internal class SentiaryWorker(
 
         // Topologically sort the languages based on fallback dependencies.
         val sortedLanguages = topologicallySort(languageOverrides)
-
-        if (sortedLanguages == null) {
-            logger.error("$TAG Could not resolve language overrides due to a circular dependency.")
-            throw GradleException("Circular dependency detected in language overrides.")
-        }
+            ?: throw GradleException("Could not resolve language overrides due to a circular dependency.")
 
         // Process the overrides in the guaranteed correct order.
         for (language in sortedLanguages) {

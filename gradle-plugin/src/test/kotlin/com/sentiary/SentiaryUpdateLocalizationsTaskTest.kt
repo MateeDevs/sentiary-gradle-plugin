@@ -43,6 +43,7 @@ class SentiaryUpdateLocalizationsTaskTest {
     private var mockEnLocalization = """<resources><string name="hello">Hello</string></resources>"""
     private var mockDeLocalization = """<resources><string name="hello">Hallo</string></resources>"""
     private var apiShouldFail = false
+    private var languagesToFail = mutableSetOf<String>()
 
     @BeforeEach
     fun setup() {
@@ -56,6 +57,7 @@ class SentiaryUpdateLocalizationsTaskTest {
     fun teardown() {
         server?.stop(100, 100)
         apiShouldFail = false
+        languagesToFail.clear()
     }
 
     private fun startServer() {
@@ -70,7 +72,12 @@ class SentiaryUpdateLocalizationsTaskTest {
                     }
                 }
                 get("/api/v1/batch/{projectId}/export") {
-                    when (call.request.queryParameters["languageId"]) {
+                    val lang = call.request.queryParameters["languageId"]
+                    if (lang in languagesToFail) {
+                        call.respondText("Not Found", status = HttpStatusCode.NotFound)
+                        return@get
+                    }
+                    when (lang) {
                         "en-US" -> call.respondText(mockEnLocalization)
                         "de-DE" -> call.respondText(mockDeLocalization)
                         else -> call.respondText("", status = HttpStatusCode.NotFound)
@@ -221,6 +228,7 @@ class SentiaryUpdateLocalizationsTaskTest {
         val result = runAndFail("sentiaryUpdateLocalizations")
 
         // Assert
+        result.task(":sentiaryUpdateProjectInfo")?.outcome shouldBe TaskOutcome.FAILED
         result.output shouldContain "BUILD FAILED"
         result.output shouldContain "500 Internal Server Error"
     }
@@ -242,6 +250,7 @@ class SentiaryUpdateLocalizationsTaskTest {
         val result = runAndFail("sentiaryUpdateLocalizations")
 
         // Assert
+        result.task(":sentiaryUpdateProjectInfo")?.outcome shouldBe TaskOutcome.FAILED
         result.output shouldContain "BUILD FAILED"
         result.output shouldContain "Sentiary projectId and projectApiKey must be set"
     }
@@ -337,6 +346,7 @@ class SentiaryUpdateLocalizationsTaskTest {
         val result = runAndFail("sentiaryUpdateLocalizations")
 
         // Assert
+        result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.FAILED
         result.output shouldContain "BUILD FAILED"
     }
 
@@ -478,6 +488,7 @@ class SentiaryUpdateLocalizationsTaskTest {
         val result = runAndFail("sentiaryUpdateLocalizations")
 
         // Assert
+        result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.FAILED
         result.output shouldContain "BUILD FAILED"
         result.output shouldContain "Could not resolve fallback for 'en-AU'. The dependency 'en-GB' is missing."
     }
@@ -506,8 +517,136 @@ class SentiaryUpdateLocalizationsTaskTest {
 
         // Assert
         result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.FAILED
+        result.output shouldContain "BUILD FAILED"
         result.output shouldContain "Could not resolve language overrides due to a circular dependency."
         projectDir.resolve("src/main/res/values-en-CA").exists() shouldBe false
         projectDir.resolve("src/main/res/values-en-GB").exists() shouldBe false
+    }
+
+    @Test
+    fun `defaultLanguage is ignored if also disabled`() {
+        // Arrange
+        mockProjectInfo = ProjectInfo("1", "Test", listOf("en-US", "de-DE"), termsLastModified = now)
+        startServer()
+        writeBuildFile("""
+            import com.sentiary.config.Format
+            plugins { id("com.sentiary.gradle") }
+            sentiary {
+                projectId = "test-project"
+                projectApiKey = "test-api-key"
+                defaultLanguage = "en-US"
+                disabledLanguages = listOf("en-US") // Disabling the default
+                exportPaths { create("android") { format = Format.Android; outputDirectory.set(layout.projectDirectory.dir("src/main/res")) } }
+            }
+        """.trimIndent())
+
+        // Act
+        val result = runTask("sentiaryUpdateLocalizations")
+
+        // Assert
+        result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.SUCCESS
+        projectDir.resolve("src/main/res/values").exists() shouldBe false // Default "values" folder should not be created
+        projectDir.resolve("src/main/res/values-de-DE").exists() shouldBe true
+    }
+
+    @Test
+    fun `fails with duplicate export path directories`() {
+        // Arrange
+        startServer()
+        writeBuildFile("""
+            import com.sentiary.config.Format
+            plugins { id("com.sentiary.gradle") }
+            sentiary {
+                projectId = "test-project"
+                projectApiKey = "test-api-key"
+                exportPaths {
+                    create("android1") { format = Format.Android; outputDirectory.set(layout.projectDirectory.dir("src/main/res")) }
+                    create("android2") { format = Format.Android; outputDirectory.set(layout.projectDirectory.dir("src/main/res")) }
+                }
+            }
+        """.trimIndent())
+
+        // Act
+        val result = runAndFail("sentiaryUpdateLocalizations")
+
+        // Assert
+        result.output shouldContain "BUILD FAILED"
+        result.output shouldContain "Duplicate output directories found"
+    }
+
+    @Test
+    fun `fails with read-only parent of output directory`() {
+        // Arrange
+        startServer()
+        writeBuildFile("""
+            import com.sentiary.config.Format
+            plugins { id("com.sentiary.gradle") }
+            sentiary {
+                projectId = "test-project"
+                projectApiKey = "test-api-key"
+                exportPaths { create("android") { format = Format.Android; outputDirectory.set(layout.projectDirectory.dir("src/main/res/values")) } }
+            }
+        """.trimIndent())
+        val parentDir = projectDir.resolve("src/main/res")
+        parentDir.mkdirs()
+        parentDir.setReadOnly()
+
+        // Act
+        val result = runAndFail("sentiaryUpdateLocalizations")
+
+        // Assert
+        result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.FAILED
+        result.output shouldContain "BUILD FAILED"
+        result.output shouldContain "Failed to create directory"
+    }
+
+    @Test
+    fun `fails when cache file is a directory`() {
+        // Arrange
+        startServer()
+        writeBuildFile("""
+            import com.sentiary.config.Format
+            plugins { id("com.sentiary.gradle") }
+            sentiary {
+                projectId = "test-project"
+                projectApiKey = "test-api-key"
+                exportPaths { create("android") { format = Format.Android; outputDirectory.set(layout.projectDirectory.dir("src/main/res")) } }
+            }
+        """.trimIndent())
+        projectDir.resolve("build/sentiary/timestamp").mkdirs() // Create a directory where the file should be
+
+        // Act
+        val result = runAndFail("sentiaryUpdateLocalizations")
+
+        // Assert
+        result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.FAILED
+        result.output shouldContain "BUILD FAILED"
+        result.output shouldContain "Is a directory"
+    }
+
+    @Test
+    fun `fails when api returns 404 for a specific language`() {
+        // Arrange
+        // Project info lists 'de-DE', but the export endpoint will 404 for it.
+        languagesToFail.add("de-DE")
+        mockProjectInfo = ProjectInfo("1", "Test", listOf("en-US", "de-DE"), termsLastModified = now)
+        startServer()
+        writeBuildFile("""
+            import com.sentiary.config.Format
+            plugins { id("com.sentiary.gradle") }
+            sentiary {
+                projectId = "test-project"
+                projectApiKey = "test-api-key"
+                exportPaths { create("android") { format = Format.Android; outputDirectory.set(layout.projectDirectory.dir("src/main/res")) } }
+            }
+        """.trimIndent())
+
+        // Act
+        val result = runAndFail("sentiaryUpdateLocalizations")
+
+        // Assert
+        result.task(":sentiaryUpdateLocalizations")?.outcome shouldBe TaskOutcome.FAILED
+        result.output shouldContain "BUILD FAILED"
+        result.output shouldContain "Failed to fetch localization for de-DE"
     }
 }
