@@ -66,7 +66,6 @@ sentiary {
     // Caching configuration (optional)
     caching {
         enabled = true
-        cacheFilePath.set(layout.buildDirectory.dir("sentiary").file("last-modified"))
     }
 }
 ```
@@ -91,31 +90,35 @@ The plugin will automatically pick up these properties.
 
 ## Tasks
 
-The plugin provides the following task:
+The plugin provides the following tasks:
 
-### `sentiaryFetch`
+### `sentiaryUpdateProjectInfo`
 
-This task downloads and exports the localization files from Sentiary based on your configuration. It is recommended to run this task before building your project to ensure you have the latest translations. If caching is not enabled, this may significantly increase your build times.
+This task updates a local cache of the Sentiary project information, including language configurations and modification timestamps. It is primarily used as an input for the `sentiaryUpdateLocalizations` task and does not need to be run manually.
+
+### `sentiaryUpdateLocalizations`
+
+This is the main task to run to get the newest translations. It downloads and exports the localization files from Sentiary based on your configuration. It is recommended to run this task before building your project to ensure you have the latest translations.
 
 You can run the task from the command line:
 
 ```bash
-./gradlew sentiaryFetch
+./gradlew sentiaryUpdateLocalizations
 ```
 
 To force the task to download the latest localizations regardless of the cache state, you can use the `--force-update` flag:
 
 ```bash
-./gradlew sentiaryFetch --force-update
+./gradlew sentiaryUpdateLocalizations --force-update
 ```
 
 Or you can make it a dependency of another task, for example `preBuild`:
 
 ```kotlin
-val sentiaryFetchTask = tasks.named<com.sentiary.task.SentiaryFetchTask>("sentiaryFetch")
+val sentiaryUpdateLocalizationsTask = tasks.named<com.sentiary.task.SentiaryUpdateLocalizationsTask>("sentiaryUpdateLocalizations")
 
 tasks.named("preBuild") {
-    dependsOn(sentiaryFetchTask)
+    dependsOn(sentiaryUpdateLocalizationsTask)
 }
 ```
 
@@ -123,7 +126,7 @@ tasks.named("preBuild") {
 <summary>Compose Resources configuration</summary>
 
 ```kts
-val sentiaryFetchTask = tasks.named<com.sentiary.task.SentiaryFetchTask>("sentiaryFetch")
+val sentiaryUpdateLocalizationsTask = tasks.named<com.sentiary.task.SentiaryUpdateLocalizationsTask>("sentiaryUpdateLocalizations")
 
 plugins.withId("org.jetbrains.compose") {
     tasks.matching {
@@ -133,7 +136,7 @@ plugins.withId("org.jetbrains.compose") {
             "convertXmlValueResourcesForCommonMain",
         )
     }.configureEach {
-        dependsOn(sentiaryFetchTask)
+        dependsOn(sentiaryUpdateLocalizationsTask)
     }
 }
 ```

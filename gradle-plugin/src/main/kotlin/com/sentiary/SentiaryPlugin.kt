@@ -3,11 +3,9 @@ package com.sentiary
 import com.sentiary.api.SentiaryApiClientService
 import com.sentiary.config.DefaultFolderNamingStrategy
 import com.sentiary.config.FileNamingStrategyFromFormat
-import com.sentiary.config.LocalizationOutputProvider
-import com.sentiary.model.ProjectInfo
-import com.sentiary.task.SentiaryFetchTask
-import com.sentiary.task.SentiaryProjectInfoTask
-import kotlinx.serialization.json.Json
+import com.sentiary.task.SentiaryUpdateLocalizationsSpec
+import com.sentiary.task.SentiaryUpdateLocalizationsTask
+import com.sentiary.task.SentiaryUpdateProjectInfoTask
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.create
@@ -26,39 +24,53 @@ open class SentiaryPlugin : Plugin<Project> {
             "sentiaryApiClient",
             SentiaryApiClientService::class.java
         ) {
-            parameters.sentiaryUrl.set(sentiaryExtension.sentiaryUrl)
+            parameters.sentiaryUrl.set(
+                project.providers.systemProperty("com.sentiary.internal.test.url")
+                    .orElse("https://api.sentiary.com/")
+            )
             parameters.projectId.set(sentiaryExtension.projectId)
             parameters.projectApiKey.set(sentiaryExtension.projectApiKey)
             parameters.requestTimeoutMillis.set(sentiaryExtension.requestTimeoutMillis)
         }
 
-        val sentiaryProjectInfoTask =
-            project.tasks.register<SentiaryProjectInfoTask>("sentiaryProjectInfo") {
+        val sentiaryUpdateProjectInfoTask =
+            project.tasks.register<SentiaryUpdateProjectInfoTask>("sentiaryUpdateProjectInfo") {
                 group = "Sentiary"
-                description = "Downloads project info from Sentiary."
+                description = "Updates a local cache of the Sentiary project information, including language configurations and modification timestamps."
                 sentiaryApiClientService.set(sentiaryServiceProvider)
                 projectInfoFile.set(project.layout.buildDirectory.file("sentiary/project-info.json"))
                 outputs.upToDateWhen { false } // Always check for new languages
             }
 
-        project.tasks.register<SentiaryFetchTask>("sentiaryFetch") {
+        project.tasks.register<SentiaryUpdateLocalizationsTask>("sentiaryUpdateLocalizations") {
             group = "Sentiary"
-            description = "Downloads and exports localization files from Sentiary."
+            description = "Updates local localization files from Sentiary."
 
             sentiaryApiClientService.set(sentiaryServiceProvider)
             defaultLanguage.set(sentiaryExtension.defaultLanguage)
-            languageOverrides.set(project.provider { sentiaryExtension.languageOverrides.toList() })
+            languageOverrides.set(sentiaryExtension.languageOverrides)
             disabledLanguages.set(sentiaryExtension.disabledLanguages)
-            exportPaths.set(project.provider { sentiaryExtension.exportPaths.toList() })
+            exportPaths.set(sentiaryExtension.exportPaths)
             caching.set(sentiaryExtension.caching)
-            cacheFile.set(sentiaryExtension.caching.cacheFilePath)
-            projectInfoFile.set(sentiaryProjectInfoTask.flatMap { it.projectInfoFile })
+            cacheFile.set(project.layout.buildDirectory.file("sentiary/timestamp"))
+            projectInfoFile.set(sentiaryUpdateProjectInfoTask.flatMap { it.projectInfoFile })
 
-            // The task action itself will determine if work needs to be done.
             outputs.dirs(sentiaryExtension.exportPaths.map { it.outputDirectory })
+            outputs.upToDateWhen(
+                SentiaryUpdateLocalizationsSpec(
+                    forceUpdate = forceUpdate,
+                    projectInfoFile = projectInfoFile,
+                    languageOverrides = languageOverrides,
+                    disabledLanguages = disabledLanguages,
+                    exportPaths = exportPaths,
+                    defaultLanguage = defaultLanguage,
+                    caching = caching,
+                    cacheFile = cacheFile,
+                )
+            )
 
             forceUpdate.convention(false)
-            dependsOn(sentiaryProjectInfoTask)
+            dependsOn(sentiaryUpdateProjectInfoTask)
         }
     }
 }

@@ -22,7 +22,6 @@ internal class SentiaryWorker(
     private val exportPaths: List<ExportPath>,
     private val cacheConfiguration: CacheConfiguration,
     private val cacheFile: File,
-    private val forceUpdate: Boolean,
 ) {
 
     private val outputProvider = LocalizationOutputProvider(
@@ -36,11 +35,6 @@ internal class SentiaryWorker(
     fun run(): Boolean = runBlocking { execute() }
 
     private suspend fun execute(): Boolean {
-        if (checkIfUpToDate()) {
-            logger.info("$TAG Localizations are up to date")
-            return false
-        }
-
         logger.info("$TAG Project Name: ${projectInfo.name}")
         logger.info("$TAG Languages: ${projectInfo.languages.joinToString(", ")}")
 
@@ -100,40 +94,6 @@ internal class SentiaryWorker(
         if (!cacheConfiguration.enabled.get()) return
         cacheFile.parentFile.mkdirs()
         cacheFile.writeText(lastModified.toString())
-    }
-
-    private fun checkIfUpToDate(): Boolean {
-        if (forceUpdate) {
-            logger.lifecycle("$TAG Force update is enabled, forcing download.")
-            return false
-        }
-
-        for (expectedFile in outputProvider.getOutputFiles()) {
-            if (!expectedFile.exists()) {
-                logger.lifecycle("$TAG Output file ${expectedFile.path} is missing, forcing download.")
-                return false
-            }
-        }
-
-        if (!cacheConfiguration.enabled.get()) {
-            logger.debug("$TAG Caching is disabled, forcing download.")
-            return false
-        }
-
-        if (!cacheFile.exists()) {
-            logger.debug("$TAG Cache file does not exist, forcing download.")
-            return false
-        }
-
-        val cacheLastModified = Instant.Companion.parse(cacheFile.readText().trim())
-        val remoteLastModified = projectInfo.termsLastModified
-
-        val isUpToDate = remoteLastModified <= cacheLastModified
-        if (!isUpToDate) {
-            logger.lifecycle("$TAG Remote content is newer, forcing download.")
-        }
-
-        return isUpToDate
     }
 
     private suspend fun fetchLocalizationForLanguage(

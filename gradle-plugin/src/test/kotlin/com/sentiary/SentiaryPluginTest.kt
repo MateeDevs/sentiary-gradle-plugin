@@ -7,12 +7,13 @@ import org.junit.jupiter.api.Test
 class SentiaryPluginTest {
 
     @Test
-    fun `plugin registers sentiaryFetch task`() {
+    fun `plugin registers required tasks`() {
         // Arrange
         val project = ProjectBuilder.builder().build()
         project.plugins.apply("com.sentiary.gradle")
 
         // Act & Assert
-        project.tasks.findByName("sentiaryFetch") shouldNotBe null
+        project.tasks.findByName("sentiaryUpdateProjectInfo") shouldNotBe null
+        project.tasks.findByName("sentiaryUpdateLocalizations") shouldNotBe null
     }
 }

@@ -1,7 +1,5 @@
 package com.sentiary.config
 
-import com.sentiary.config.NamingStrategy
-
 /**
  * A singleton, serializable naming strategy for folders.
  * Returns "values" for the default language and "values-{language}" for others.

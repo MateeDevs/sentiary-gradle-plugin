@@ -15,7 +15,6 @@ abstract class SentiaryPluginExtension @Inject constructor(
     objects: ObjectFactory,
     project: Project,
 ) {
-    abstract val sentiaryUrl: Property<String>
     abstract val projectId: Property<String>
     abstract val projectApiKey: Property<String>
 
@@ -40,7 +39,6 @@ abstract class SentiaryPluginExtension @Inject constructor(
     val caching: CacheConfiguration = objects.newInstance(CacheConfiguration::class.java)
 
     init {
-        sentiaryUrl.convention("https://api.sentiary.com/")
         defaultLanguage.convention("en-US")
         requestTimeoutMillis.convention(100_000L)
         disabledLanguages.convention(emptyList())
@@ -55,9 +53,6 @@ abstract class SentiaryPluginExtension @Inject constructor(
         )
 
         caching.enabled.convention(true)
-        caching.cacheFilePath.convention(
-            project.layout.buildDirectory.get().dir("sentiary").file("last-modified")
-        )
     }
 
     fun caching(action: Action<CacheConfiguration>) {

@@ -18,10 +18,13 @@ import org.gradle.api.tasks.Nested
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.options.Option
 
-abstract class SentiaryFetchTask : DefaultTask() {
+abstract class SentiaryUpdateLocalizationsTask : DefaultTask() {
 
     @get:Input
-    @get:Option(option = "force-update", description = "Forces the download of the localization files, ignoring the cache.")
+    @get:Option(
+        option = "force-update",
+        description = "Forces the download of the localization files, ignoring the cache."
+    )
     abstract val forceUpdate: Property<Boolean>
 
     @get:Internal
@@ -55,7 +58,8 @@ abstract class SentiaryFetchTask : DefaultTask() {
             throw IllegalArgumentException("Sentiary projectId and projectApiKey must be set.")
         }
 
-        val projectInfo = Json.decodeFromString<ProjectInfo>(projectInfoFile.get().asFile.readText())
+        val projectInfo =
+            Json.decodeFromString<ProjectInfo>(projectInfoFile.get().asFile.readText())
 
         val worker = SentiaryWorker(
             client = service.client,
@@ -67,7 +71,6 @@ abstract class SentiaryFetchTask : DefaultTask() {
             exportPaths = exportPaths.get(),
             cacheConfiguration = caching.get(),
             cacheFile = cacheFile.get().asFile,
-            forceUpdate = forceUpdate.getOrElse(false),
         )
         didWork = worker.run()
     }

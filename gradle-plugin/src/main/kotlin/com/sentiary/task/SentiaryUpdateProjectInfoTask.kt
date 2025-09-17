@@ -10,7 +10,7 @@ import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 
-abstract class SentiaryProjectInfoTask : DefaultTask() {
+abstract class SentiaryUpdateProjectInfoTask : DefaultTask() {
 
     @get:Internal
     abstract val sentiaryApiClientService: Property<SentiaryApiClientService>

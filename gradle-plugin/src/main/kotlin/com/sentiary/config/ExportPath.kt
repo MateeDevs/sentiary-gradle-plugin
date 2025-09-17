@@ -1,7 +1,5 @@
 package com.sentiary.config
 
-import com.sentiary.config.Format
-import com.sentiary.config.NamingStrategy
 import org.gradle.api.Named
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property

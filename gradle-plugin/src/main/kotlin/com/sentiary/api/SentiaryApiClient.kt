@@ -59,14 +59,14 @@ class SentiaryApiClient(
         }.bodyAsChannel().copyAndClose(channel)
     }
 
+    fun close() {
+        client.close()
+    }
+
     private object Routes {
         class Project(projectId: String) {
             val export = "/api/v1/batch/$projectId/export"
             val info = "/api/v1/batch/$projectId/info"
         }
-    }
-
-    fun close() {
-        client.close()
     }
 }

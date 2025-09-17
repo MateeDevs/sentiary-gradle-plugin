@@ -7,19 +7,20 @@ plugins {
 }
 
 dependencies {
-    implementation(kotlin("stdlib"))
-    implementation(gradleApi())
-
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.datetime)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
-    implementation(libs.ktor.client.logging)
-    implementation(libs.kotlinx.datetime)
 
     testImplementation(kotlin("test"))
-    testImplementation(libs.kotest.assertions)
+    testImplementation(libs.kotest.runner.junit5)
+    testImplementation(libs.kotest.assertions.core)
     testImplementation(libs.mockk)
+    testImplementation(libs.ktor.server.netty)
+    testImplementation(libs.ktor.server.content.negotiation)
+    testImplementation(libs.ktor.serialization.kotlinx.json)
 }
 
 tasks.withType<Test> {
@@ -41,6 +42,15 @@ gradlePlugin {
             displayName = "Sentiary Gradle Plugin"
             description = "A Gradle plugin to download and manage localization files from the Sentiary platform."
             tags.set(listOf("sentiary", "strings", "localization", "translations"))
+        }
+    }
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "localPluginRepository"
+            url = uri("../../local-plugin-repository")
         }
     }
 }
