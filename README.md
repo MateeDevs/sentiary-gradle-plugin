@@ -11,7 +11,7 @@ integrating them into your Android or Kotlin Multiplatform project.
 - **Automated Downloads**: Fetches and updates localization files automatically.
 - **Flexible Configuration**: Easily configure output formats, language overrides, and naming
   strategies.
-- **Caching**: Avoids unnecessary downloads by caching project information and translations.
+- **Caching**: Avoids unnecessary downloads by caching latest change of translations.
 
 ## Getting Started
 
@@ -74,20 +74,20 @@ script. The plugin resolves them in the following order of priority:
 
 The `sentiary` extension offers the following configuration options:
 
-| Property               | Type                               | Description                                                                                             | Default Value      |
-| ---------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------ |
-| `projectId`            | `Property<String>`                 | **Required.** Your Sentiary project ID.                                                                 | -                  |
-| `projectApiKey`        | `Property<String>`                 | **Required.** Your Sentiary project API key.                                                            | -                  |
-| `defaultLanguage`      | `Property<String>`                 | The IETF BCP 47 language tag for the default language.                                                  | `"en-US"`          |
-| `disabledLanguages`    | `ListProperty<String>`             | A list of language tags to exclude from downloads.                                                      | `[]` (empty list)  |
-| `requestTimeoutMillis` | `Property<Long>`                   | Network request timeout in milliseconds.                                                                | `100000`           |
-| `languageOverrides`    | `NamedDomainObjectContainer<...>`  | Defines rules to create new language localizations based on existing ones. See example below.           | -                  |
-| `exportPaths`          | `NamedDomainObjectContainer<...>`  | **Required.** Defines output configurations for localization files. See example below.                  | -                  |
-| `caching`              | `CacheConfiguration`               | Configures caching behavior.                                                                            | `enabled = true`   |
+| Property            | Description                                                                                   | Default Value     |
+|---------------------|-----------------------------------------------------------------------------------------------|-------------------|
+| `projectId`         | **Required.** Your Sentiary project ID.                                                       | -                 |
+| `projectApiKey`     | **Required.** Your Sentiary project API key.                                                  | -                 |
+| `defaultLanguage`   | The IETF BCP 47 language tag for the default language.                                        | `"en-US"`         |
+| `disabledLanguages` | A list of language tags to exclude from downloads.                                            | `[]` (empty list) |
+| `languageOverrides` | Defines rules to create new language localizations based on existing ones. See example below. | -                 |
+| `exportPaths`       | Defines output configurations for localization files. See example below.                      | -                 |
+| `caching`           | Configures caching behavior.                                                                  | `enabled = true`  |
 
 #### `languageOverrides`
 
-Use this to create a language that is a copy of another. For example, to create an `sk-SK` localization that is a copy of `cs-CZ`. Transitive fallbacks are also supported.
+Use this to create a language that is a copy of another. For example, to create an `sk-SK`
+localization that is a copy of `cs-CZ`. Transitive fallbacks are also supported.
 
 ```kotlin
 sentiary {
@@ -157,11 +157,16 @@ dependency of `sentiaryUpdateLocalizations` and does not need to be run manually
 
 ## Usage Examples
 
-To automatically update your localizations as part of your regular build process, you should declare a dependency on the `sentiaryUpdateLocalizations` task for any task that consumes the generated files. This ensures your project always builds with the latest translations. If you prefer to update localizations manually, you can simply run the `./gradlew sentiaryUpdateLocalizations` task as needed and skip adding the explicit dependency.
+To automatically update your localizations as part of your regular build process, you should declare
+a dependency on the `sentiaryUpdateLocalizations` task for any task that consumes the generated
+files. This ensures your project always builds with the latest translations. If you prefer to update
+localizations manually, you can simply run the `./gradlew sentiaryUpdateLocalizations` task as
+needed and skip adding the explicit dependency.
 
 ### Single-Module Project
 
-In a single-module project, apply and configure the plugin in your `build.gradle.kts` file. Then, hook the `sentiaryUpdateLocalizations` task into the build process.
+In a single-module project, apply and configure the plugin in your `build.gradle.kts` file. Then,
+hook the `sentiaryUpdateLocalizations` task into the build process.
 
 For an Android project, make the `process[Variant]AndroidResources` tasks depend on it:
 
@@ -184,7 +189,10 @@ sentiary {
 
 ### Multi-Module Project
 
-In a multi-module setup, you should first make the plugin available to all subprojects by adding it to the root `build.gradle.kts` file with `apply false`. Then, the recommended approach is to apply the plugin and common configuration in a convention plugin, and apply that convention plugin to each sub-module.
+In a multi-module setup, you should first make the plugin available to all subprojects by adding it
+to the root `build.gradle.kts` file with `apply false`. Then, the recommended approach is to apply
+the plugin and common configuration in a convention plugin, and apply that convention plugin to each
+sub-module.
 
 #### 1. Declare the Plugin in the Root Project
 
@@ -199,7 +207,8 @@ plugins {
 
 #### 2. Create a Convention Plugin
 
-First, create a convention plugin (e.g., in `build-logic`) for Sentiary. This allows you to share the base configuration across modules.
+First, create a convention plugin (e.g., in `build-logic`) for Sentiary. This allows you to share
+the base configuration across modules.
 
 ```kotlin
 // build-logic/src/main/kotlin/sentiary-convention.gradle.kts
@@ -217,7 +226,8 @@ extensions.configure<com.sentiary.SentiaryPluginExtension> {
 }
 ```
 
-You will also need to add the Sentiary plugin as a dependency in your convention plugin's build script:
+You will also need to add the Sentiary plugin as a dependency in your convention plugin's build
+script:
 
 ```kotlin
 // build-logic/build.gradle.kts
@@ -228,7 +238,8 @@ dependencies {
 
 #### 3. Apply to Sub-Modules
 
-In each sub-module where you need localizations, apply your convention plugin and configure the module-specific `exportPaths`.
+In each sub-module where you need localizations, apply your convention plugin and configure the
+module-specific `exportPaths`.
 
 **Example for an Android Module:**
 
@@ -274,4 +285,5 @@ sentiary {
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file
+for details.
