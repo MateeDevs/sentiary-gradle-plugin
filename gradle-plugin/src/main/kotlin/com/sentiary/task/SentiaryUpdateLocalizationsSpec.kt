@@ -25,15 +25,16 @@ internal class SentiaryUpdateLocalizationsSpec(
 ) : Spec<Task> {
 
     override fun isSatisfiedBy(element: Task): Boolean {
+        logger.debug("[Sentiary] Running SentiaryUpdateLocalizationsSpec")
         if (forceUpdate.getOrElse(false)) {
             logger.debug("[Sentiary] Force update enabled, updating localizations")
-            return false
+            return true
         }
 
         val projectInfoFileProvider = projectInfoFile.get().asFile
         if (!projectInfoFileProvider.exists()) {
             logger.debug("[Sentiary] Project info file does not exist, updating localizations")
-            return false
+            return true
         }
 
         val projectInfo = Json.decodeFromString<ProjectInfo>(projectInfoFileProvider.readText())
@@ -47,27 +48,27 @@ internal class SentiaryUpdateLocalizationsSpec(
 
         if (outputProvider.getOutputFiles().any { !it.exists() }) {
             logger.debug("[Sentiary] Some output files do not exist, updating localizations")
-            return false
+            return true
         }
 
         val cachingConfig = caching.get()
         if (!cachingConfig.enabled.get()) {
             logger.debug("[Sentiary] Caching is not enabled, updating localizations")
-            return false
+            return true
         }
 
         val cacheFileProvider = cacheFile.get().asFile
         if (!cacheFileProvider.exists()) {
             logger.debug("[Sentiary] Cache file does not exist, updating localizations")
-            return false
+            return true
         }
 
         val cacheLastModified = kotlinx.datetime.Instant.parse(cacheFileProvider.readText().trim())
         val remoteLastModified = projectInfo.termsLastModified
 
         logger.debug("[Sentiary] remoteLastModified: $remoteLastModified, cacheLastModified: $cacheLastModified")
-        logger.debug("[Sentiary] remoteLastModified <= cacheLastModified: ${remoteLastModified <= cacheLastModified}")
+        logger.debug("[Sentiary] remoteLastModified > cacheLastModified: ${remoteLastModified > cacheLastModified}")
 
-        return remoteLastModified <= cacheLastModified
+        return remoteLastModified > cacheLastModified
     }
 }

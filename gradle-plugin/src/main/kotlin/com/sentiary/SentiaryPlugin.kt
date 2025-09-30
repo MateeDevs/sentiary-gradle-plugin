@@ -44,16 +44,17 @@ open class SentiaryPlugin : Plugin<Project> {
             parameters.requestTimeoutMillis.set(sentiaryExtension.requestTimeoutMillis)
         }
 
+        val rootProject = findRootProject(project)
         val sentiaryUpdateProjectInfoTask =
-            if (INFO_TASK in project.rootProject.tasks.names) {
-                project.rootProject.tasks.named<SentiaryUpdateProjectInfoTask>(INFO_TASK)
+            if (INFO_TASK in rootProject.tasks.names) {
+                rootProject.tasks.named<SentiaryUpdateProjectInfoTask>(INFO_TASK)
             } else {
-                project.rootProject.tasks.register<SentiaryUpdateProjectInfoTask>(INFO_TASK) {
+                rootProject.tasks.register<SentiaryUpdateProjectInfoTask>(INFO_TASK) {
                     group = "Sentiary"
                     description =
                         "Updates a local cache of the Sentiary project information, including language configurations and modification timestamps."
                     sentiaryApiClientService.set(sentiaryServiceProvider)
-                    projectInfoFile.set(project.layout.buildDirectory.file("sentiary/project-info.json"))
+                    projectInfoFile.set(rootProject.layout.buildDirectory.file("sentiary/project-info.json"))
                     outputs.upToDateWhen { false } // Always check for new languages
                 }
             }
@@ -74,7 +75,7 @@ open class SentiaryPlugin : Plugin<Project> {
             // We do not declare output directories because this task writes into a shared resource folder (`src/main/res`).
             // Declaring it would create an incorrect implicit dependency for all other tasks that use this folder.
             // Instead, we rely entirely on our custom up-to-date spec to ensure the task runs when needed.
-            outputs.upToDateWhen(
+            onlyIf(
                 SentiaryUpdateLocalizationsSpec(
                     forceUpdate = forceUpdate,
                     projectInfoFile = projectInfoFile,
@@ -90,6 +91,17 @@ open class SentiaryPlugin : Plugin<Project> {
             forceUpdate.convention(false)
             dependsOn(sentiaryUpdateProjectInfoTask)
         }
+    }
+
+    /**
+     * Iteratively find the most root project.
+     */
+    private fun findRootProject(project: Project): Project {
+        var root = project
+        while (root != root.rootProject) {
+            root = root.rootProject
+        }
+        return root
     }
 
 
