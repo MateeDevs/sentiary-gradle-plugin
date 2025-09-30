@@ -1,6 +1,20 @@
-# Sentiary Gradle Plugin
+<div align="center">
+
+  <picture>
+    <img alt="Sentiary logo" src="https://sentiary.com/logo.webp" width="128">
+  </picture>
+
+</div>
+<br>
+
+<div align="center">
 
 [![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/com.sentiary.gradle)](https://plugins.gradle.org/plugin/com.sentiary.gradle)
+[![GitHub License](https://img.shields.io/github/license/mateedevs/sentiary-gradle-plugin)](https://www.gnu.org/licenses/gpl-3.0.html)
+
+</div>
+
+# Sentiary Gradle Plugin
 
 The Sentiary Gradle plugin provides a convenient way to download and manage your localization files
 from the Sentiary platform. It automates the process of fetching the latest translations and
