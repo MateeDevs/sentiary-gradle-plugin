@@ -10,6 +10,7 @@ import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.create
+import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
 
 open class SentiaryPlugin : Plugin<Project> {
@@ -30,8 +31,8 @@ open class SentiaryPlugin : Plugin<Project> {
             }
         }
 
-        val sentiaryServiceProvider = project.gradle.sharedServices.registerIfAbsent(
-            "sentiaryApiClient",
+        val sentiaryServiceProvider = project.rootProject.gradle.sharedServices.registerIfAbsent(
+            API_CLIENT_SERVICE,
             SentiaryApiClientService::class.java
         ) {
             parameters.sentiaryUrl.set(
@@ -44,15 +45,20 @@ open class SentiaryPlugin : Plugin<Project> {
         }
 
         val sentiaryUpdateProjectInfoTask =
-            project.tasks.register<SentiaryUpdateProjectInfoTask>("sentiaryUpdateProjectInfo") {
-                group = "Sentiary"
-                description = "Updates a local cache of the Sentiary project information, including language configurations and modification timestamps."
-                sentiaryApiClientService.set(sentiaryServiceProvider)
-                projectInfoFile.set(project.layout.buildDirectory.file("sentiary/project-info.json"))
-                outputs.upToDateWhen { false } // Always check for new languages
+            if (INFO_TASK in project.rootProject.tasks.names) {
+                project.rootProject.tasks.named<SentiaryUpdateProjectInfoTask>(INFO_TASK)
+            } else {
+                project.rootProject.tasks.register<SentiaryUpdateProjectInfoTask>(INFO_TASK) {
+                    group = "Sentiary"
+                    description =
+                        "Updates a local cache of the Sentiary project information, including language configurations and modification timestamps."
+                    sentiaryApiClientService.set(sentiaryServiceProvider)
+                    projectInfoFile.set(project.layout.buildDirectory.file("sentiary/project-info.json"))
+                    outputs.upToDateWhen { false } // Always check for new languages
+                }
             }
 
-        project.tasks.register<SentiaryUpdateLocalizationsTask>("sentiaryUpdateLocalizations") {
+        project.tasks.register<SentiaryUpdateLocalizationsTask>(UPDATE_TASK) {
             group = "Sentiary"
             description = "Updates local localization files from Sentiary."
 
@@ -84,5 +90,12 @@ open class SentiaryPlugin : Plugin<Project> {
             forceUpdate.convention(false)
             dependsOn(sentiaryUpdateProjectInfoTask)
         }
+    }
+
+
+    companion object {
+        const val API_CLIENT_SERVICE = "sentiaryApiClient"
+        const val INFO_TASK = "sentiaryUpdateProjectInfo"
+        const val UPDATE_TASK = "sentiaryUpdateLocalizations"
     }
 }
