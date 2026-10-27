@@ -144,6 +144,6 @@ The TestKit fixtures use Python 3 as a small protocol test double; the actual CL
 Android fixtures require an Android SDK (`ANDROID_HOME`, or the standard macOS SDK location) with platform 36.
 They run resource tasks for app/library and KMP Compose, parallel modules, Configuration Cache reuse, and collisions.
 
-Before publishing 2.0, complete the backend cache rollout and migration through 5, verify authenticated
+Before publishing 2.0, complete the backend cache rollout and migration through 6, verify authenticated
 `export/state` protocol 1, then publish CLI `v2.0.0` with all six native binaries and `SHA256SUMS`.
 Verify downloaded release assets before publishing the plugin. Local tests do not deploy or migrate a backend.
