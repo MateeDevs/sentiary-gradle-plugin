@@ -2,33 +2,29 @@ plugins {
     kotlin("jvm")
     `java-gradle-plugin`
     `kotlin-dsl`
+    id("org.jlleitschuh.gradle.ktlint") version "13.1.0"
     alias(libs.plugins.pluginPublish)
-    alias(libs.plugins.serialization)
 }
 
 dependencies {
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.datetime)
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.cio)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.serialization.kotlinx.json)
-
+    implementation(libs.gson)
     testImplementation(kotlin("test"))
-    testImplementation(libs.kotest.runner.junit5)
-    testImplementation(libs.kotest.assertions.core)
-    testImplementation(libs.mockk)
-    testImplementation(libs.ktor.server.netty)
-    testImplementation(libs.ktor.server.content.negotiation)
-    testImplementation(libs.ktor.serialization.kotlinx.json)
+    testImplementation(gradleTestKit())
+    testImplementation(libs.junit)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    systemProperty("sentiary.test.cli", providers.environmentVariable("SENTIARY_TEST_CLI").getOrElse(""))
 }
 
 kotlin {
-    jvmToolchain(libs.versions.java.get().toInt())
+    jvmToolchain(
+        libs.versions.java
+            .get()
+            .toInt(),
+    )
 }
 
 gradlePlugin {

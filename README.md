@@ -1,303 +1,149 @@
-<div align="center">
+# Sentiary Gradle plugin 2.0
 
-  <picture>
-    <img alt="Sentiary logo" src="https://sentiary.com/logo.webp" width="128">
-  </picture>
+A settings plugin that runs the Sentiary CLI and connects its named outputs to Android and Compose resources.
+The CLI owns TOML parsing, credentials, languages, aliases, formats, downloads, cache, and generated-file ownership.
+The plugin owns CLI installation and build resource bindings.
 
-</div>
-<br>
+## Documentation
 
-<div align="center">
+See the [Sentiary documentation sources](https://github.com/MateeDevs/sentiary-tools/tree/main/docs)
+for the CLI, shared TOML configuration, and migration guidance.
+[Gradle plugin 2.0 documentation](https://github.com/MateeDevs/sentiary-tools/blob/main/docs/gradle/index.md)
+is **unreleased** and must be checked against its completed implementation.
 
-[![Gradle Plugin Portal](https://img.shields.io/gradle-plugin-portal/v/com.sentiary.gradle)](https://plugins.gradle.org/plugin/com.sentiary.gradle)
-[![GitHub License](https://img.shields.io/github/license/mateedevs/sentiary-gradle-plugin)](https://www.gnu.org/licenses/gpl-3.0.html)
+## Setup
 
-</div>
-
-# Sentiary Gradle Plugin
-
-The Sentiary Gradle plugin provides a convenient way to download and manage your localization files
-from the Sentiary platform. It automates the process of fetching the latest translations and
-integrating them into your Android or Kotlin Multiplatform project.
-
-## Features
-
-- **Automated Downloads**: Fetches and updates localization files automatically.
-- **Flexible Configuration**: Easily configure output formats, language overrides, and naming
-  strategies.
-- **Caching**: Avoids unnecessary downloads by caching latest change of translations.
-
-## Getting Started
-
-To use the Sentiary Gradle plugin, you need to apply it to your project.
-
-### 1. Apply the Plugin
-
-It is recommended to apply the plugin in your `build.gradle.kts` file.
+Apply the plugin once in `settings.gradle.kts`, after configuring plugin repositories:
 
 ```kotlin
-// build.gradle.kts
-plugins {
-    id("com.sentiary.gradle") version "<plugin-version>"
-}
-```
-
-### 2. Configure the Plugin
-
-Add the `sentiary` block to your `build.gradle.kts` and provide the necessary configuration. At a
-minimum, you must specify your project credentials and define at least one export path.
-
-```kotlin
-sentiary {
-    // Sentiary project ID (see Credentials section)
-    projectId = "YOUR_PROJECT_ID"
-
-    // Sentiary project API key (see Credentials section)
-    projectApiKey = "YOUR_PROJECT_API_KEY"
-
-    // Define where and how to export localization files
-    exportPaths {
-        create("android") {
-            format.set(com.sentiary.config.Format.Android)
-            outputDirectory.set(layout.projectDirectory.dir("src/main/res"))
-        }
-    }
-}
-```
-
-## Configuration
-
-### Credentials
-
-It is strongly recommended to store your `projectId` and `projectApiKey` outside of your build
-script. The plugin resolves them in the following order of priority:
-
-1. **Gradle Properties**: In a `gradle.properties` or `local.properties` file.
-   ```properties
-   sentiary.projectId=YOUR_PROJECT_ID
-   sentiary.projectApiKey=YOUR_PROJECT_API_KEY
-   ```
-2. **Environment Variables**:
-   ```bash
-   export SENTIARY_PROJECT_ID="YOUR_PROJECT_ID"
-   export SENTIARY_PROJECT_API_KEY="YOUR_PROJECT_API_KEY"
-   ```
-3. **Directly in `build.gradle.kts`**: As a last resort, you can set them in the `sentiary` block.
-
-### Plugin DSL Reference
-
-The `sentiary` extension offers the following configuration options:
-
-| Property            | Description                                                                                   | Default Value     |
-|---------------------|-----------------------------------------------------------------------------------------------|-------------------|
-| `projectId`         | **Required.** Your Sentiary project ID.                                                       | -                 |
-| `projectApiKey`     | **Required.** Your Sentiary project API key.                                                  | -                 |
-| `defaultLanguage`   | The IETF BCP 47 language tag for the default language.                                        | `"en-US"`         |
-| `disabledLanguages` | A list of language tags to exclude from downloads.                                            | `[]` (empty list) |
-| `languageOverrides` | Defines rules to create new language localizations based on existing ones. See example below. | -                 |
-| `exportPaths`       | Defines output configurations for localization files. See example below.                      | -                 |
-| `caching`           | Configures caching behavior.                                                                  | `enabled = true`  |
-
-#### `languageOverrides`
-
-Use this to create a language that is a copy of another. For example, to create an `sk-SK`
-localization that is a copy of `cs-CZ`. Transitive fallbacks are also supported.
-
-```kotlin
-sentiary {
-    languageOverrides {
-        create("sk-SK") {
-            fallbackTo.set("cs-CZ") // Language tag for the source language.
-        }
-    }
-}
-```
-
-#### `exportPaths`
-
-This is where you define how your localization files are generated. You can have multiple export
-paths for different formats or modules.
-
-```kotlin
-sentiary {
-    exportPaths {
-        create("android") {
-            // Export format. Available formats: Android, ComposeResources, Json, Apple.
-            format.set(com.sentiary.config.Format.Android)
-
-            // Path to the output directory.
-            outputDirectory.set(layout.projectDirectory.dir("src/main/res"))
-
-            // (Optional) Naming strategies for folders and files.
-            // The plugin provides sensible defaults based on the chosen format.
-            folderNamingStrategy { language, isDefault ->
-                if (isDefault) "values" else "values-$language"
-            }
-
-            fileNamingStrategy { _, _ ->
-                "strings.xml"
-            }
-        }
-    }
-}
-```
-
-## Tasks
-
-The plugin provides the following tasks:
-
-### `sentiaryUpdateLocalizations`
-
-This is the main task to run to get the newest translations. It downloads and exports the
-localization files from Sentiary based on your configuration.
-
-You can run the task manually from the command line:
-
-```bash
-./gradlew sentiaryUpdateLocalizations
-```
-
-To force the task to download the latest localizations regardless of the cache state, use the
-`--force-update` flag:
-
-```bash
-./gradlew sentiaryUpdateLocalizations --force-update
-```
-
-### `sentiaryUpdateProjectInfo`
-
-This task updates a local cache of the Sentiary project information. It runs automatically as a
-dependency of `sentiaryUpdateLocalizations` and does not need to be run manually.
-
-## Usage Examples
-
-To automatically update your localizations as part of your regular build process, you should declare
-a dependency on the `sentiaryUpdateLocalizations` task for any task that consumes the generated
-files. This ensures your project always builds with the latest translations. If you prefer to update
-localizations manually, you can simply run the `./gradlew sentiaryUpdateLocalizations` task as
-needed and skip adding the explicit dependency.
-
-### Single-Module Project
-
-In a single-module project, apply and configure the plugin in your `build.gradle.kts` file. Then,
-hook the `sentiaryUpdateLocalizations` task into the build process.
-
-For an Android project, make the `process[Variant]AndroidResources` tasks depend on it:
-
-```kotlin
-tasks.withType<com.android.build.gradle.tasks.ProcessAndroidResources> {
-    dependsOn("sentiaryUpdateLocalizations")
-}
+pluginManagement { repositories { gradlePluginPortal(); google(); mavenCentral() } }
+plugins { id("com.sentiary.gradle") version "2.0.0" }
+include(":app", ":shared")
 
 sentiary {
-    projectId = "YOUR_PROJECT_ID"
-    projectApiKey = "YOUR_PROJECT_API_KEY"
-    exportPaths {
-        create("android") {
-            format.set(com.sentiary.config.Format.Android)
-            outputDirectory.set(layout.projectDirectory.dir("src/main/res"))
+    android {
+        create("app") {
+            modulePath = ":app"
+            output = "android"
+            sourceSet = "main"
+            resourceRoot = "app/build/generated/sentiary"
+        }
+    }
+    compose {
+        create("shared") {
+            modulePath = ":shared"
+            output = "compose"
+            sourceSet = "commonMain"
+            resourceRoot = "shared/build/generated/sentiary"
+            localDirectories = listOf("shared/additionalResources")
         }
     }
 }
 ```
 
-### Multi-Module Project
+Create `sentiary.toml` at the build root with `sentiary-cli init`, or use:
 
-In a multi-module setup, you should first make the plugin available to all subprojects by adding it
-to the root `build.gradle.kts` file with `apply false`. Then, the recommended approach is to apply
-the plugin and common configuration in a convention plugin, and apply that convention plugin to each
-sub-module.
+```toml
+config_version = 1
+[projects.mobile]
+id = "existing-project-id"
+languages = ["en", "cs"]
 
-#### 1. Declare the Plugin in the Root Project
+[outputs.android]
+project = "mobile"
+format = "android"
+path = "app/build/generated/sentiary/{locale}/strings.xml"
+locale_map = { en = "values", cs = "values-cs" }
 
-In your root `build.gradle.kts`, declare the Sentiary plugin but do not apply it.
-
-```kotlin
-// root build.gradle.kts
-plugins {
-    id("com.sentiary.gradle") apply false
-}
+[outputs.compose]
+project = "mobile"
+format = "compose"
+path = "shared/build/generated/sentiary/{locale}/strings.xml"
+locale_map = { en = "values", cs = "values-cs" }
 ```
 
-#### 2. Create a Convention Plugin
+Set `SENTIARY_USER_API_KEY` in the environment or put `user_api_key` in an ignored `sentiary.local.toml`.
+The shared TOML may hold a project `api_key` when explicitly intended. Credentials never belong in Gradle DSL.
+All DSL resource roots and additional directories are relative to the build root; TOML paths are relative
+to the config directory. Android/Compose bindings require matching per-language output formats and destinations
+strictly inside `resourceRoot`.
 
-First, create a convention plugin (e.g., in `build-logic`) for Sentiary. This allows you to share
-the base configuration across modules.
+The CLI discovers config from the build root and its parents. Technical overrides are Gradle properties:
 
-```kotlin
-// build-logic/src/main/kotlin/sentiary-convention.gradle.kts
-plugins {
-    id("com.sentiary.gradle")
-}
+| Property | Default |
+| --- | --- |
+| `sentiary.config` | CLI config discovery from the build root |
+| `sentiary.cliVersion` | `v2.0.0` |
+| `sentiary.cliExecutable` | Verified binary in Gradle user-home `caches/sentiary/cli/<version>/<platform>` |
 
-extensions.configure<com.sentiary.SentiaryPluginExtension> {
-    defaultLanguage.set("en-US")
-    languageOverrides {
-        create("sk-SK") {
-            fallbackTo.set("cs-CZ")
-        }
-    }
-}
+An override executable must support integration protocol 1. It can be relative to the build root or absolute.
+Automatic installation supports macOS, Linux, and Windows on AMD64 and ARM64, verifies release SHA-256,
+locks across processes, and atomically installs the executable. It never changes PATH. A missing or corrupt
+managed binary fails clearly offline. `SENTIARY_BASE_URL` selects another API environment without changing TOML.
+
+## Build behavior
+
+The plugin performs no CLI execution, TOML read, or networking during configuration. Isolated callbacks
+configure only the current project. Resource tasks depend by task path on a single `:sentiaryPull`, which
+selects all bound outputs together, including bindings in modules not consumed by this invocation. Unbound
+outputs are excluded. Running `sentiaryPull` with no bindings pulls all outputs from the config.
+
+Each relevant build performs online validation, including Configuration Cache reuse. Gradle's up-to-date
+checks and Build Cache cannot skip the check. Errors fail the build; there is no automatic offline fallback.
+`--offline` is forwarded to the CLI, which can restore one complete cached download set after generated files
+are deleted. The required compatible CLI binary must already be available offline.
+
+Android app/library bindings preserve `main`, build-type, flavor, and variant source-set overlay priorities.
+Use a separate binding/output for each layer needed. Each source set stages its existing local resource
+directories together with the selected generated files; direct resource tasks also depend on staging.
+Android test components and direct XML resources for the new KMP Android library plugin are deferred.
+
+Compose stages `src/<sourceSet>/composeResources`, optional `localDirectories`, and generated resources into
+one `customDirectory` registration. KMP Compose is supported. A separate user `customDirectory` registration
+for that source set is unsupported. Distinct physical files with the same relative path (including case-only
+collisions) fail. The same physical input is copied once. Avoid putting generated outputs in a staging directory.
+AGP and Compose are optional integrations, accessed only through public signatures; neither is a runtime dependency.
+
+## Verified consumer versions
+
+The target matrix is Gradle **9.1.0**, JDK **21**, AGP **9.0.0**, Kotlin **2.3.20**, Compose **1.10.3**.
+No broader compatibility is promised. AGP 9 has built-in Kotlin; declare Kotlin 2.3.20 in the root plugin
+classpath when needed to align it with this matrix.
+
+For Isolated Projects with this Compose version, disable its automatic Hot Reload plugin:
+
+```properties
+org.jetbrains.compose.hot.reload.disable=true
 ```
 
-You will also need to add the Sentiary plugin as a dependency in your convention plugin's build
-script:
+TestKit also sets `kotlin.internal.collectFUSMetrics=false` to avoid a Kotlin statistics build-service
+classloader conflict. The Sentiary tasks do not access another project's mutable state.
 
-```kotlin
-// build-logic/build.gradle.kts
-dependencies {
-    compileOnly("com.sentiary:gradle-plugin:<plugin-version>")
-}
+## Migrate from 1.x
+
+1. Remove all project-level `com.sentiary.gradle` applications and the old `sentiary` DSL.
+2. Move project IDs, keys, languages, formats, path policies, and language overrides into `sentiary.toml`.
+   Use `language_aliases` for whole-file language overrides and `locale_map` for destination qualifiers.
+3. Apply 2.0 once in settings and add the appropriate source-set bindings.
+4. Replace explicit `sentiaryUpdateLocalizations`/`sentiaryUpdateProjectInfo` dependencies with `:sentiaryPull`
+   where automatic resource integration does not apply.
+5. Run online once, then verify `--offline` and Configuration Cache reuse in your build.
+
+There is no transitional old DSL or embedded HTTP downloader. Existing standalone CLI `export` and `import`
+commands remain available. Manual changes to CLI-owned files still require explicit CLI `--force` recovery.
+
+## Validate and release
+
+```sh
+./gradlew :gradle-plugin:test :gradle-plugin:ktlintCheck :gradle-plugin:validatePlugins
+# Also exercise the actual CLI against the local fixture server:
+SENTIARY_TEST_CLI=/absolute/path/to/sentiary-cli ./gradlew :gradle-plugin:test
 ```
 
-#### 3. Apply to Sub-Modules
+The TestKit fixtures use Python 3 as a small protocol test double; the actual CLI fixture uses the supplied binary.
+Android fixtures require an Android SDK (`ANDROID_HOME`, or the standard macOS SDK location) with platform 36.
+They run resource tasks for app/library and KMP Compose, parallel modules, Configuration Cache reuse, and collisions.
 
-In each sub-module where you need localizations, apply your convention plugin and configure the
-module-specific `exportPaths`.
-
-**Example for an Android Module:**
-
-```kotlin
-plugins {
-    id("sentiary-convention")
-}
-
-tasks.withType<com.android.build.gradle.tasks.ProcessAndroidResources> {
-    dependsOn("sentiaryUpdateLocalizations")
-}
-
-sentiary {
-    exportPaths {
-        create("android") {
-            format.set(com.sentiary.config.Format.Android)
-            outputDirectory.set(layout.projectDirectory.dir("src/main/res"))
-        }
-    }
-}
-```
-
-**Example for a Kotlin Multiplatform (Compose Resources) Module:**
-
-```kotlin
-plugins {
-    id("sentiary-convention")
-}
-
-tasks.named("prepareComposeResourcesTaskForCommonMain") {
-    dependsOn("sentiaryUpdateLocalizations")
-}
-
-sentiary {
-    exportPaths {
-        create("composeResources") {
-            format.set(com.sentiary.config.Format.ComposeResources)
-            outputDirectory.set(layout.projectDirectory.dir("src/commonMain/composeResources"))
-        }
-    }
-}
-```
-
-## License
-
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file
-for details.
+Before publishing 2.0, complete the backend cache rollout and migration through 5, verify authenticated
+`export/state` protocol 1, then publish CLI `v2.0.0` with all six native binaries and `SHA256SUMS`.
+Verify downloaded release assets before publishing the plugin. Local tests do not deploy or migrate a backend.

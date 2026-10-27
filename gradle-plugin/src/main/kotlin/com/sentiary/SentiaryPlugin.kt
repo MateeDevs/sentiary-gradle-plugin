@@ -1,113 +1,106 @@
 package com.sentiary
 
-import com.sentiary.api.SentiaryApiClientService
-import com.sentiary.config.DefaultFolderNamingStrategy
-import com.sentiary.config.FileNamingStrategyFromFormat
-import com.sentiary.task.SentiaryUpdateLocalizationsSpec
-import com.sentiary.task.SentiaryUpdateLocalizationsTask
-import com.sentiary.task.SentiaryUpdateProjectInfoTask
 import org.gradle.api.GradleException
+import org.gradle.api.IsolatedAction
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.kotlin.dsl.create
-import org.gradle.kotlin.dsl.named
-import org.gradle.kotlin.dsl.register
+import org.gradle.api.initialization.Settings
+import org.gradle.util.GradleVersion
+import java.io.File
 
-open class SentiaryPlugin : Plugin<Project> {
-    override fun apply(project: Project) {
-        val sentiaryExtension = project.extensions.create<SentiaryPluginExtension>("sentiary")
-
-        sentiaryExtension.exportPaths.all {
-            folderNamingStrategy.convention(DefaultFolderNamingStrategy)
-            fileNamingStrategy.convention(format.map { FileNamingStrategyFromFormat(it) })
-        }
-
-        project.afterEvaluate {
-            val exportPaths = sentiaryExtension.exportPaths
-            val outputDirs = exportPaths.map { it.outputDirectory.get().asFile }
-            val duplicates = outputDirs.groupingBy { it }.eachCount().filter { it.value > 1 }.keys
-            if (duplicates.isNotEmpty()) {
-                throw GradleException("Duplicate output directories found in sentiary exportPaths: ${duplicates.joinToString()}")
-            }
-        }
-
-        val sentiaryServiceProvider = project.rootProject.gradle.sharedServices.registerIfAbsent(
-            API_CLIENT_SERVICE,
-            SentiaryApiClientService::class.java
-        ) {
-            parameters.sentiaryUrl.set(
-                project.providers.systemProperty("com.sentiary.internal.test.url")
-                    .orElse("https://api.sentiary.com/")
-            )
-            parameters.projectId.set(sentiaryExtension.projectId)
-            parameters.projectApiKey.set(sentiaryExtension.projectApiKey)
-            parameters.requestTimeoutMillis.set(sentiaryExtension.requestTimeoutMillis)
-        }
-
-        val rootProject = findRootProject(project)
-        val sentiaryUpdateProjectInfoTask =
-            if (INFO_TASK in rootProject.tasks.names) {
-                rootProject.tasks.named<SentiaryUpdateProjectInfoTask>(INFO_TASK)
-            } else {
-                rootProject.tasks.register<SentiaryUpdateProjectInfoTask>(INFO_TASK) {
-                    group = "Sentiary"
-                    description =
-                        "Updates a local cache of the Sentiary project information, including language configurations and modification timestamps."
-                    sentiaryApiClientService.set(sentiaryServiceProvider)
-                    projectInfoFile.set(rootProject.layout.buildDirectory.file("sentiary/project-info.json"))
-                    outputs.upToDateWhen { false } // Always check for new languages
+class SentiaryPlugin : Plugin<Settings> {
+    override fun apply(settings: Settings) {
+        require(GradleVersion.current() >= GradleVersion.version("9.1.0")) { "Sentiary 2 requires Gradle 9.1.0 or newer" }
+        val extension = settings.extensions.create("sentiary", SentiaryExtension::class.java)
+        settings.gradle.settingsEvaluated {
+            val bindings = listOf("android" to extension.android, "compose" to extension.compose).flatMap { (kind, entries) ->
+                entries.map { entry ->
+                    require(entry.modulePath.startsWith(":")) { "${entry.name}: modulePath must be absolute" }
+                    require(settings.findProject(entry.modulePath) != null) { "Unknown module ${entry.modulePath}" }
+                    require(
+                        entry.output.isNotBlank() && entry.resourceRoot.isNotBlank(),
+                    ) { "${entry.name}: output and resourceRoot are required" }
+                    require(entry.sourceSet.matches(Regex("[A-Za-z][A-Za-z0-9_]*"))) { "Invalid sourceSet" }
+                    require(!File(entry.resourceRoot).isAbsolute) { "resourceRoot must be relative to the build root" }
+                    require(entry.localDirectories.all { !File(it).isAbsolute }) { "localDirectories must be relative to the build root" }
+                    if (kind == "android") {
+                        require(entry.localDirectories.isEmpty()) { "Android local resources come from its source set" }
+                        require(
+                            !entry.sourceSet.startsWith("test", ignoreCase = true) &&
+                                !entry.sourceSet.startsWith("androidTest", ignoreCase = true),
+                        ) { "Android test source sets are not supported" }
+                    }
+                    Binding(
+                        entry.name,
+                        kind,
+                        entry.modulePath,
+                        entry.output,
+                        entry.sourceSet,
+                        File(settings.rootDir, entry.resourceRoot).canonicalPath,
+                        entry.localDirectories.map { File(settings.rootDir, it).canonicalPath },
+                    )
                 }
             }
-
-        project.tasks.register<SentiaryUpdateLocalizationsTask>(UPDATE_TASK) {
-            group = "Sentiary"
-            description = "Updates local localization files from Sentiary."
-
-            sentiaryApiClientService.set(sentiaryServiceProvider)
-            defaultLanguage.set(sentiaryExtension.defaultLanguage)
-            languageOverrides.set(sentiaryExtension.languageOverrides)
-            disabledLanguages.set(sentiaryExtension.disabledLanguages)
-            exportPaths.set(sentiaryExtension.exportPaths)
-            caching.set(sentiaryExtension.caching)
-            cacheFile.set(project.layout.buildDirectory.file("sentiary/timestamp"))
-            projectInfoFile.set(sentiaryUpdateProjectInfoTask.flatMap { it.projectInfoFile })
-
-            // We do not declare output directories because this task writes into a shared resource folder (`src/main/res`).
-            // Declaring it would create an incorrect implicit dependency for all other tasks that use this folder.
-            // Instead, we rely entirely on our custom up-to-date spec to ensure the task runs when needed.
-            onlyIf(
-                SentiaryUpdateLocalizationsSpec(
-                    forceUpdate = forceUpdate,
-                    projectInfoFile = projectInfoFile,
-                    languageOverrides = languageOverrides,
-                    disabledLanguages = disabledLanguages,
-                    exportPaths = exportPaths,
-                    defaultLanguage = defaultLanguage,
-                    caching = caching,
-                    cacheFile = cacheFile,
-                )
+            val duplicate = bindings.groupBy { Triple(it.modulePath, it.kind, it.sourceSet) }.values.firstOrNull { it.size > 1 }
+            if (duplicate !=
+                null
+            ) {
+                throw GradleException("Only one Sentiary binding per source set is supported: ${duplicate.first().sourceSet}")
+            }
+            settings.gradle.lifecycle.beforeProject(
+                ConfigureProject(
+                    settings.rootDir.absolutePath,
+                    settings.gradle.gradleUserHomeDir
+                        .resolve("caches/sentiary/cli")
+                        .absolutePath,
+                    settings.providers.gradleProperty("sentiary.config").orNull,
+                    settings.providers.gradleProperty("sentiary.cliVersion").getOrElse("v2.0.0"),
+                    settings.providers.gradleProperty("sentiary.cliExecutable").orNull,
+                    settings.gradle.startParameter.isOffline,
+                    bindings,
+                ),
             )
-
-            forceUpdate.convention(false)
-            dependsOn(sentiaryUpdateProjectInfoTask)
         }
     }
+}
 
-    /**
-     * Iteratively find the most root project.
-     */
-    private fun findRootProject(project: Project): Project {
-        var root = project
-        while (root != root.rootProject) {
-            root = root.rootProject
+private class ConfigureProject(
+    private val root: String,
+    private val cliCache: String,
+    private val config: String?,
+    private val version: String,
+    private val executable: String?,
+    private val offline: Boolean,
+    private val bindings: List<Binding>,
+) : IsolatedAction<Project> {
+    override fun execute(project: Project) {
+        if (project.path == ":") {
+            project.tasks.register("sentiaryPull", SentiaryPull::class.java) {
+                buildRoot.set(root)
+                cliCache.set(this@ConfigureProject.cliCache)
+                configPath.set(config ?: "")
+                cliVersion.set(version)
+                cliExecutable.set(executable ?: "")
+                offline.set(this@ConfigureProject.offline)
+                bindings.set(this@ConfigureProject.bindings.map(Protocol::binding))
+                resultFile.set(File(root, ".gradle/sentiary/result.json"))
+            }
         }
-        return root
-    }
-
-
-    companion object {
-        const val API_CLIENT_SERVICE = "sentiaryApiClient"
-        const val INFO_TASK = "sentiaryUpdateProjectInfo"
-        const val UPDATE_TASK = "sentiaryUpdateLocalizations"
+        bindings.filter { it.modulePath == project.path }.forEach { binding ->
+            project.afterEvaluate {
+                val present = when (binding.kind) {
+                    "android" -> pluginManager.hasPlugin("com.android.application") || pluginManager.hasPlugin("com.android.library")
+                    "compose" -> pluginManager.hasPlugin("org.jetbrains.compose")
+                    else -> false
+                }
+                require(present) {
+                    "${binding.name}: ${binding.kind} resource binding requires the corresponding framework plugin in ${binding.modulePath}"
+                }
+            }
+            when (binding.kind) {
+                "android" -> AndroidResources.attach(project, binding, root)
+                "compose" -> ComposeResources.attach(project, binding, root)
+            }
+        }
     }
 }
