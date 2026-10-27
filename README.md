@@ -1,5 +1,10 @@
 # Sentiary Gradle plugin 2.0
 
+> **This repository has moved.** Further development and issue reports belong in
+> [MateeDevs/sentiary-tools](https://github.com/MateeDevs/sentiary-tools).
+> See the [Gradle plugin documentation](https://github.com/MateeDevs/sentiary-tools/blob/staging/docs/gradle/index.md).
+> The plugin ID remains `com.sentiary.gradle`. This repository is retained for historical reference.
+
 A settings plugin that runs the Sentiary CLI and connects its named outputs to Android and Compose resources.
 The CLI owns TOML parsing, credentials, languages, aliases, formats, downloads, cache, and generated-file ownership.
 The plugin owns CLI installation and build resource bindings.
