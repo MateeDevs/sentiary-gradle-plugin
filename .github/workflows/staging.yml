@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: MateeDevs/sentiary-tools
-          ref: 683fb4d2a66b042ada6cacb8e0775ead78f0e55d
+          ref: b1bde26b2000184e2ca92a834a819601137d8395
           path: tools
       - name: Build integration CLI
         working-directory: tools

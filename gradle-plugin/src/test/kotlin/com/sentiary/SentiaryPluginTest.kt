@@ -273,7 +273,7 @@ class SentiaryPluginTest {
         val server = com.sun.net.httpserver.HttpServer
             .create(java.net.InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/") { exchange ->
-            assertEquals("Ribbon fixture-key", exchange.requestHeaders.getFirst("Authorization"))
+            assertEquals("Bearer fixture-key", exchange.requestHeaders.getFirst("Authorization"))
             if (exchange.requestURI.path.endsWith("/state")) {
                 stateRequests.incrementAndGet()
                 val bytes = """
